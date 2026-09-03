@@ -1,12 +1,12 @@
 import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, WebAppInfo
 import requests
 import time
 import threading
 
-BOT_TOKEN = '8610173918:AAEleQaxBNZxcA5pruXpg-5gdRPS_AZtLzk'
-MINI_APP_URL = 'https://freeincomebot-8gc.pages.dev/' # আপনার ওয়েব অ্যাপ লিংক
-VIDEO_URL = 'https://t.me/Tutorial_Video_Xvm/9' # টেলিগ্রাম ফাইল আইডি
+BOT_TOKEN = '8610173918:AAEoAi6_QsCc_JTBkgKYJtST6I7OADIpqE0'
+MINI_APP_URL = 'https://incomebot.pages.dev/' # আপনার ওয়েব অ্যাপ লিংক
+VIDEO_URL = 'https://t.me/Tutorial_Video_Xvm/10' # টেলিগ্রাম ফাইল আইডি
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -145,6 +145,7 @@ def process_user_registration_and_menu(chat_id, uid, name, ref_id):
     if int(uid) in ADMIN_ID:
         admin_markup = ReplyKeyboardMarkup(resize_keyboard=True)
         admin_markup.add(KeyboardButton("Total User"), KeyboardButton("Notice"))
+        admin_markup.add(KeyboardButton("🔙 Back"))
         bot.send_message(chat_id, "👨‍💻 Admin Panel Access Granted:", reply_markup=admin_markup)
 
 # ================= 3. Start Command =================
@@ -279,6 +280,15 @@ def total_users(message):
         except:
             pass
     bot.send_message(message.chat.id, f"📊 সমস্ত ডাটাবেজ মিলিয়ে মোট ইউজার: {total} জন")
+
+# ব্যাক বাটন - এডমিন কিবোর্ড সরিয়ে মূল মেনুতে ফিরিয়ে দেয়
+@bot.message_handler(func=lambda message: message.text == "🔙 Back" and message.from_user.id in ADMIN_ID)
+def admin_back(message):
+    bot.send_message(
+        message.chat.id,
+        "🔙 আপনি মূল মেনুতে ফিরে এসেছেন।",
+        reply_markup=ReplyKeyboardRemove()
+    )
 
 # এখানে == এর বদলে in ব্যবহার করা হয়েছে
 @bot.message_handler(func=lambda message: message.text == "Notice" and message.from_user.id in ADMIN_ID)
