@@ -27,17 +27,44 @@ REQUIRED_CHANNELS = [
 # গ্লোবাল ভেরিয়েবল (ব্রডকাস্ট ক্যানসেল করার জন্য)
 broadcast_status = {"is_running": False, "cancel": False}
 
+# ================= Debug Helper =================
+def safe_json(response, context=""):
+    """
+    Firebase theke HTTP 200 e vul/permission error asleo seta valid JSON hওয়ায়
+    ager code bhulbhabe seta 'data ache' dhore nito (karon dict shobshomoy truthy).
+    Ekhon status_code check kora hocche ebong {"error": ...} response ele
+    sorasori console-e print kore None return kora hocche, jate asol karon bojha jay.
+    """
+    try:
+        data = response.json()
+    except Exception as e:
+        print(f"[FIREBASE ERROR][{context}] JSON parse failed | status={response.status_code} | body={response.text[:200]} | err={e}")
+        return None
+
+    if response.status_code != 200:
+        print(f"[FIREBASE ERROR][{context}] status {response.status_code} | body={data}")
+        return None
+
+    if isinstance(data, dict) and "error" in data:
+        print(f"[FIREBASE ERROR][{context}] permission/rule error: {data.get('error')}  "
+              f"-> Check your Firebase Rules (Read/Write must be allowed).")
+        return None
+
+    return data
+
 # ================= Database Routing Logic =================
 def get_user_db_url(uid):
     uid_str = str(uid)
     # যেহেতু ওয়েব অ্যাপে র‍্যান্ডম ডাটাবেজ সিলেক্ট হয়, তাই আগে চেক করতে হবে ইউজার কোন ডাটাবেজে আছে
     try:
-        if requests.get(f"{DB_URLS[0]}/users/{uid_str}.json?shallow=true").json():
+        r0 = requests.get(f"{DB_URLS[0]}/users/{uid_str}.json?shallow=true")
+        if safe_json(r0, f"get_user_db_url:{uid_str}:db0"):
             return DB_URLS[0]
-        if requests.get(f"{DB_URLS[1]}/users/{uid_str}.json?shallow=true").json():
+        r1 = requests.get(f"{DB_URLS[1]}/users/{uid_str}.json?shallow=true")
+        if safe_json(r1, f"get_user_db_url:{uid_str}:db1"):
             return DB_URLS[1]
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[FIREBASE ERROR][get_user_db_url:{uid_str}] {e}")
     
     # নতুন ইউজার হলে 50/50 সিস্টেমে ভাগ করে দেওয়া হবে
     return DB_URLS[int(uid) % 2]
@@ -45,11 +72,12 @@ def get_user_db_url(uid):
 def get_referral_reward():
     # অ্যাডমিন প্যানেল থেকে রেফার বোনাস ডাটা ফেচ করা, না পেলে ডিফল্ট 50 টাকা
     try:
-        res = requests.get(f"{DB_URLS[0]}/admin_settings/referral_reward.json").json()
+        r = requests.get(f"{DB_URLS[0]}/admin_settings/referral_reward.json")
+        res = safe_json(r, "get_referral_reward")
         if res is not None:
             return float(res)
-    except:
-        pass
+    except Exception as e:
+        print(f"[FIREBASE ERROR][get_referral_reward] {e}")
     return 50.0
 
 # ================= 1. Membership Check Logic =================
@@ -59,8 +87,9 @@ def is_subscribed(user_id):
             status = bot.get_chat_member(ch["username"], user_id).status
             if status in ['left', 'kicked']:
                 return False
-        except Exception:
+        except Exception as e:
             # যদি বট এডমিন না থাকে বা ইউজারকে খুঁজে না পায়, তাহলে False ধরবে
+            print(f"[SUBSCRIBE CHECK ERROR] channel={ch['username']} user={user_id} err={e} -> সাধারণত এর মানে বট ওই চ্যানেলে Admin নেই।")
             return False
     return True
 
@@ -81,7 +110,8 @@ def process_user_registration_and_menu(chat_id, uid, name, ref_id):
     db_url = get_user_db_url(uid)
     
     # ইউজার ডাটাবেজে আছে কি না চেক করা
-    check_user = requests.get(f"{db_url}/users/{uid}.json").json()
+    r_check = requests.get(f"{db_url}/users/{uid}.json")
+    check_user = safe_json(r_check, f"check_user:{uid}")
     
     if not check_user:
         # নতুন ইউজার সেভ করা (ঠিক index.html এর ভেরিয়েবল অনুযায়ী)
@@ -97,33 +127,45 @@ def process_user_registration_and_menu(chat_id, uid, name, ref_id):
         requests.patch(f"{db_url}/users/{uid}.json", json=new_user_data)
         
         # রেফারেল চেক করা (যদি কনফার্ম বাটনের সাথে রেফার আইডি এসে থাকে)
-        if ref_id and ref_id != "None" and ref_id.isdigit():
-            if ref_id != str(uid):
-                ref_db = get_user_db_url(ref_id)
-                ref_data = requests.get(f"{ref_db}/users/{ref_id}.json").json()
-                if ref_data:
-                    reward = get_referral_reward()
-                    
-                    # আগের ব্যালেন্সগুলো ফেচ করা
-                    curr_bal = ref_data.get('balance', 0)
-                    curr_life = ref_data.get('lifetime_earned', curr_bal)
-                    curr_refs = ref_data.get('refs', 0)
-                    curr_ref_inc = ref_data.get('ref_income', 0)
-                    
-                    # নতুন ডাটা আপডেট করা
-                    update_data = {
-                        "balance": curr_bal + reward,
-                        "lifetime_earned": curr_life + reward,
-                        "refs": curr_refs + 1,
-                        "ref_income": curr_ref_inc + reward
-                    }
-                    requests.patch(f"{ref_db}/users/{ref_id}.json", json=update_data)
-                    
-                    # রেফারারকে মেসেজ পাঠানো
-                    try:
-                        bot.send_message(ref_id, f"🎉 রেফার সাকসেসফুল! আপনার একাউন্টে ৳{reward} জমা হয়েছে।")
-                    except Exception:
-                        pass
+        print(f"[REFERRAL DEBUG] new_user={uid} ref_id={ref_id!r}")
+        try:
+            if ref_id and ref_id != "None" and ref_id.isdigit():
+                if ref_id != str(uid):
+                    ref_db = get_user_db_url(ref_id)
+                    r_ref = requests.get(f"{ref_db}/users/{ref_id}.json")
+                    ref_data = safe_json(r_ref, f"referral_lookup:{ref_id}")
+                    print(f"[REFERRAL DEBUG] ref_db={ref_db} ref_data_found={bool(ref_data)}")
+
+                    if ref_data:
+                        reward = get_referral_reward()
+                        print(f"[REFERRAL DEBUG] reward={reward}")
+
+                        # আগের ব্যালেন্সগুলো ফেচ করা
+                        curr_bal = ref_data.get('balance', 0)
+                        curr_life = ref_data.get('lifetime_earned', curr_bal)
+                        curr_refs = ref_data.get('refs', 0)
+                        curr_ref_inc = ref_data.get('ref_income', 0)
+
+                        # নতুন ডাটা আপডেট করা
+                        update_data = {
+                            "balance": curr_bal + reward,
+                            "lifetime_earned": curr_life + reward,
+                            "refs": curr_refs + 1,
+                            "ref_income": curr_ref_inc + reward
+                        }
+                        r_patch = requests.patch(f"{ref_db}/users/{ref_id}.json", json=update_data)
+                        patched = safe_json(r_patch, f"referral_patch:{ref_id}")
+                        print(f"[REFERRAL DEBUG] patch_success={patched is not None}")
+
+                        # রেফারারকে মেসেজ পাঠানো
+                        try:
+                            bot.send_message(ref_id, f"🎉 রেফার সাকসেসফুল! আপনার একাউন্টে ৳{reward} জমা হয়েছে।")
+                        except Exception as e:
+                            print(f"[REFERRAL DEBUG] could not DM referrer {ref_id}: {e}  (ইউজার হয়তো বট ব্লক করেছে, বা কখনো /start দেয়নি)")
+                    else:
+                        print(f"[REFERRAL DEBUG] referrer id {ref_id} not found in either database, or Firebase denied read.")
+        except Exception as e:
+            print(f"[REFERRAL ERROR] referral processing crashed for new_user={uid}, ref_id={ref_id}: {e}")
 
     # ইনলাইন বাটন তৈরি (Mini App, Video & Referral)
     markup = InlineKeyboardMarkup(row_width=1)
