@@ -110,10 +110,15 @@ def process_user_registration_and_menu(chat_id, uid, name, ref_id):
     db_url = get_user_db_url(uid)
     
     # ইউজার ডাটাবেজে আছে কি না চেক করা
+    # গুরুত্বপূর্ণ: শুধু 'channel_left' ফিল্ড থাকলেই সেটা "আগে থেকে রেজিস্ট্রার্ড" ধরা যাবে না —
+    # track_channel_membership হ্যান্ডলার চ্যানেলে জয়েন করা মাত্রই (কনফার্ম করার আগেই)
+    # শুধু channel_left ফিল্ড লিখে দেয়। আসল রেজিস্ট্রেশন হয়েছে কিনা বোঝার জন্য 'joined' ফিল্ড চেক করা হচ্ছে।
     r_check = requests.get(f"{db_url}/users/{uid}.json")
     check_user = safe_json(r_check, f"check_user:{uid}")
+    is_already_registered = bool(check_user) and "joined" in check_user
+    print(f"[REGISTER DEBUG] uid={uid} check_user={check_user} is_already_registered={is_already_registered}")
     
-    if not check_user:
+    if not is_already_registered:
         # নতুন ইউজার সেভ করা (ঠিক index.html এর ভেরিয়েবল অনুযায়ী)
         new_user_data = {
             "name": name, 
