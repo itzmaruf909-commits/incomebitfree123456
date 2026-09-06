@@ -7,6 +7,7 @@ import threading
 BOT_TOKEN = '8610173918:AAEoAi6_QsCc_JTBkgKYJtST6I7OADIpqE0'
 MINI_APP_URL = 'https://incomebot.pages.dev/' # আপনার ওয়েব অ্যাপ লিংক
 VIDEO_URL = 'https://t.me/Tutorial_Video_Xvm/10' # টেলিগ্রাম ফাইল আইডি
+WEBSITE_URL = 'https://omg10.com/4/10980666' # অ্যাফিলিয়েট ওয়েবসাইট লিংক (ভিজিট বাটন)
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -21,7 +22,8 @@ DB_URLS = [
 # ================= Mandatory Channels =================
 # আপনার দেওয়া নতুন চ্যানেল যুক্ত করা হয়েছে
 REQUIRED_CHANNELS = [
-    {"username": "@FreeIncomeXv", "name": "Free Income XV", "url": "https://t.me/FreeIncomeXv"}
+    {"username": "@FreeIncomeXv", "name": "Free Income XV", "url": "https://t.me/FreeIncomeXv"},
+    {"username": "@Instant_Payment_Tips_24", "name": "Instant Payment Tips", "url": "https://t.me/Instant_Payment_Tips_24"}
 ]
 
 # গ্লোবাল ভেরিয়েবল (ব্রডকাস্ট ক্যানসেল করার জন্য)
@@ -99,7 +101,10 @@ def get_join_markup(ref_id="None"):
     # ডাইনামিকভাবে রিকোয়ার্ড চ্যানেলের বাটন তৈরি
     for ch in REQUIRED_CHANNELS:
         markup.add(InlineKeyboardButton(text=f"📢 {ch['name']}", url=ch['url']))
-        
+
+    # ওয়েবসাইট ভিজিট বাটন (মেম্বারশিপ চেক করা সম্ভব না, শুধু বাটন হিসেবে দেখানো হচ্ছে)
+    markup.add(InlineKeyboardButton(text="🌐 ভিজিট ওয়েবসাইট", url=WEBSITE_URL))
+
     # কনফার্ম বাটন
     btn_confirm = InlineKeyboardButton(text="✅ কনফার্ম", callback_data=f"check_join_{ref_id}")
     markup.add(btn_confirm)
@@ -209,7 +214,7 @@ def send_welcome(message):
     if not is_subscribed(uid):
         bot.send_message(
             message.chat.id, 
-            "⚠️ আমাদের বটটি ব্যবহার করতে হলে অবশ্যই নিচের চ্যানেলে জয়েন করতে হবে।\n\nচ্যানেলে জয়েন করে '✅ কনফার্ম' বাটনে ক্লিক করুন:", 
+            "⚠️ আমাদের বট ব্যবহার করতে হলে নিচের ৩টি বাটনে ক্লিক করতে হবে।\n\nসবগুলো বাটনে ক্লিক করার পর '✅ কনফার্ম' বাটনে ক্লিক করুন:", 
             reply_markup=get_join_markup(ref_id)
         )
         return
