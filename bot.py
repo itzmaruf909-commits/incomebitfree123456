@@ -5,7 +5,7 @@ import time
 import threading
 
 BOT_TOKEN = '8610173918:AAEoAi6_QsCc_JTBkgKYJtST6I7OADIpqE0'
-MINI_APP_URL = 'https://incomebot.pages.dev/' # আপনার ওয়েব অ্যাপ লিংক
+MINI_APP_URL = 'https://incomebot.pages.dev/' # আপনার ওয়েব অ্যাপ লিংক 
 VIDEO_URL = 'https://t.me/Tutorial_Video_Xvm/10' # টেলিগ্রাম ফাইল আইডি
 WEBSITE_URL = 'https://omg10.com/4/10980666' # অ্যাফিলিয়েট ওয়েবসাইট লিংক (ভিজিট বাটন)
 
